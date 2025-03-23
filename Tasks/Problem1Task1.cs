@@ -14,11 +14,11 @@ namespace MCassignment_PHYS539_PeidusD_2025.Tasks
         {
             double[] photonEnergy = [2.0, 6.0, 10.0];
             int numPhotons = 1000000;
-            //Create 100x100x100cm phantom
+            //Create 5x cm phantom
             double voxelSizeCm = 0.05;
-            var nx = 100;
-            var ny = 100;
-            var nz = 100;
+            var nx = 150;
+            var ny = 150;
+            var nz = 150;
             foreach (var _photonEnergy in photonEnergy)
             {
                 Console.WriteLine($"\n{_photonEnergy}MeV photon simulation started...");

@@ -169,6 +169,10 @@ namespace MCassignment_PHYS539_PeidusD_2025.Containers
             finalBitmap.Save($"{photonEnergy}MeV_"+filename, ImageFormat.Png);
             Console.WriteLine($"Saved slice+electron tracks: {filename}");
         }
+        public void SaveKernelWithIsolines(int iIndex,string filename)
+        {
+
+        }
 
         public int FindPeakYSlice()
         {

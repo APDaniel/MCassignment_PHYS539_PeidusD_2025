@@ -24,9 +24,14 @@ namespace MCassignment_PHYS539_PeidusD_2025.Helpers
         }
         public static double GetTotalLinearAttenuationCoefficient(double energy)
         {
-            double atomsPerCm3 = 3.34e22; //for water
-            var cs = GetCrossSections(energy);
-            return cs.Total * 1e-24 * atomsPerCm3;
+            if (Math.Abs(energy - 2.0) < 0.1)
+                return 0.049;
+            if (Math.Abs(energy - 6.0) < 0.1)
+                return 0.029;
+            if (Math.Abs(energy - 10.0) < 0.1)
+                return 0.022;
+
+            throw new ArgumentException("Unsupported attenuation coefficient");
         }
         public static string SampleInteractionType(double energy)
         {

@@ -10,24 +10,27 @@ namespace MCassignment_PHYS539_PeidusD_2025.Engine
         {
             for (int i =1; i <= numPhotons; i++)
             {
-                SimulatePhoton(voxels, photonEnergy);
+                Random random = new Random();
+                SimulatePhoton(voxels, photonEnergy, random);
             }
             int peakY = voxels.FindPeakYSlice();
             voxels.SaveSliceWithTracksAsImage(peakY, "kernel_peak_with_tracks.png", allTracks, photonEnergy);
+            voxels.SaveKernelWithIsolines(peakY, "kernel_peak_with_tracks.png");
         }
-        private static void SimulatePhoton(WaterTankPhantom voxels, double energy)
+        private static void SimulatePhoton(WaterTankPhantom voxels, double energy, Random random)
         {
             //Launch photons from center of XY at Z=0
             double centerX = (voxels.Nx * voxels.VoxelSizeCm) / 2;
             double centerY = (voxels.Ny * voxels.VoxelSizeCm) / 2;
-            Vector3 position = new Vector3((float)centerX, (float)centerY, 0f);
-            Vector3 direction = new Vector3(0f, 0f, 0f);
+            double centerZ = (voxels.Nz * voxels.VoxelSizeCm) / 2;
+            Vector3 position = new Vector3((float)centerX, (float)centerY, (float)centerZ);
+            Vector3 direction = new Vector3(0f, 0f, (float)voxels.VoxelSizeCm);
 
             //Sample distance to interaction
             double mu = PhysicsData.GetTotalLinearAttenuationCoefficient(energy); //in cm-1
-            var random = new Random(); var R = random.NextDouble();
-            double distance = -(1 / mu) * Math.Log(R);
-            Vector3 interactionPoint = position + direction * (float)distance;
+            var R = random.NextDouble();
+            double distance = -Math.Log(R)/mu; //in cm; future development, not required now
+            Vector3 interactionPoint = position + direction /** (float)distance*/;
 
             //Check if the photon left the volume
             if (!voxels.BoundaryCheck(interactionPoint.X, interactionPoint.Y, interactionPoint.Z)) 
