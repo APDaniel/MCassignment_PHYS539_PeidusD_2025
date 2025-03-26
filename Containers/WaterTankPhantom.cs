@@ -169,11 +169,56 @@ namespace MCassignment_PHYS539_PeidusD_2025.Containers
             finalBitmap.Save($"{photonEnergy}MeV_"+filename, ImageFormat.Png);
             Console.WriteLine($"Saved slice+electron tracks: {filename}");
         }
-        public void SaveKernelWithIsolines(int iIndex,string filename)
+        public void SaveKernelWithIsolinesFromMaxYslice(double energy, string filename, int scale)
         {
+            int width = Nx * scale;
+            int height = Nz * scale;
 
+            Bitmap bmp = new Bitmap(width, height);
+            Graphics g = Graphics.FromImage(bmp);
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.Clear(Color.White);
+
+            //Extract 1D slice from the phantom
+            int yIndex = FindPeakYSlice();
+            double[,] slice = GetSlice2D_Y(yIndex);
+            double[] allValues = slice.Cast<double>().ToArray();
+            Array.Sort(allValues);
+            double robustMax = allValues[(int)(allValues.Length*0.999)];
+
+            //Define contour levels and brushes
+            var contourLevels = new (double min, double max, Brush brush)[]
+            {
+                (0.00, 0.20, Brushes.DarkBlue),
+                (0.20, 0.40, Brushes.Cyan),
+                (0.40, 0.60, Brushes.Green),
+                (0.60, 0.80, Brushes.Purple),
+                (0.80, 1.00, Brushes.Red)
+            };
+
+            //Draw isodose contours as dots (threshold levels)
+            for (int ix = 0; ix < Nx - 1; ix++)
+            {
+                for (int iz = 0; iz < Nz; iz++)
+                {
+                    double doseFraction = slice[ix, iz] / robustMax;
+                    if (doseFraction > 0.99999) doseFraction = 1;
+                    foreach(var (min,maxLevel,brush) in contourLevels)
+                    {
+                        if (doseFraction >= min && doseFraction < maxLevel && doseFraction>0)
+                        {
+                            int x = ix * scale;
+                            int z = iz*scale;
+                            g.FillRectangle(brush, x, z,scale,scale);
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            bmp.Save($"{energy}MeV_"+filename, ImageFormat.Png);
+            Console.WriteLine($"{energy}MeV isodose contour image saved.");
         }
-
         public int FindPeakYSlice()
         {
             double max = 0;
@@ -191,6 +236,15 @@ namespace MCassignment_PHYS539_PeidusD_2025.Containers
                 }
             }
             return bestY;
+        }
+        public double[,] GetSlice2D_Y(int yIndex)
+        {
+            double[,] slice = new double[Nx, Nz];
+
+            for (int ix = 0; ix < Nx; ix++)
+                for (int iz = 0; iz < Nz; iz++)
+                    slice[ix, iz] = doseGrid[ix, yIndex, iz];
+            return slice;
         }
     }
 }
