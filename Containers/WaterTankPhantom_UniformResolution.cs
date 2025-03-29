@@ -1,16 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Drawing;
+﻿using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.Drawing.Imaging;
-using System.Linq;
 using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace MCassignment_PHYS539_PeidusD_2025.Containers
 {
-    public class WaterTankPhantom
+    public class WaterTankPhantom_UniformResolution
     {
         private readonly double[,,] doseGrid;
         public int Nx { get; set; }
@@ -19,7 +13,7 @@ namespace MCassignment_PHYS539_PeidusD_2025.Containers
         public double VoxelSizeCm { get; set; }
         public object Bitmap { get; private set; }
 
-        public WaterTankPhantom(int nx, int ny, int nz, double voxelSizeCm)
+        public WaterTankPhantom_UniformResolution(int nx, int ny, int nz, double voxelSizeCm)
         {
             Nx = nx; Ny = ny; Nz = nz; VoxelSizeCm = voxelSizeCm;
             doseGrid = new double[nx, ny, nz];
@@ -35,7 +29,7 @@ namespace MCassignment_PHYS539_PeidusD_2025.Containers
                 iy>=0 && iy<Ny &&
                 iz>=0 && iz < Nz)
             {
-                doseGrid[ix, iy, iz] += energy;
+                doseGrid[ix, iy, iz] += Math.Round(energy,3);
             }
         }
 
@@ -46,28 +40,88 @@ namespace MCassignment_PHYS539_PeidusD_2025.Containers
         public void ExportSliceY(int yIndex, string filename, double numPhotons, double photonEnergyMeV)
         {
             var normalizedDoseGrid = NormalizeToIncidentEnergy(numPhotons, photonEnergyMeV);
-            using var writer = new StreamWriter(filename);
+            using var writer = new StreamWriter(photonEnergyMeV+"_"+filename);
 
             writer.Write("X\\Z,");
             for (int iz = 0; iz < Nz; iz++)
             {
                 double zCoord = iz * VoxelSizeCm;
-                writer.Write($"{zCoord:F2},");
+                writer.Write($"{zCoord:F2};");
             }
             writer.WriteLine();
 
             for (int ix = 0; ix < Nx; ix++)
             {
                 double xCoord = ix * VoxelSizeCm;
-                writer.Write($"{xCoord:F2},");
+                writer.Write($"{xCoord:F2};");
 
                 for (int iz = 0; iz < Nz; iz++)
                 {
                     double val = normalizedDoseGrid[ix, yIndex, iz];
-                    writer.Write($"{val:E4},");
+                    writer.Write($"{val:E4};");
                 }
                 writer.WriteLine();
             }
+            writer.Close();
+
+            /*string path = "TEST_isolines.csv"; // path to your uploaded CSV
+
+            // === STEP 1: Load CSV ===
+            string[] lines = File.ReadAllLines(path);
+            ScottPlot.Plot plt = new();
+            // Parse Z (column) positions from header
+            double[] zCoords = lines[0]
+                .Split(';').Skip(1)
+                .Select(s => double.Parse(s.Trim()))
+                .ToArray();
+
+            int Nz1 = zCoords.Length;
+            int Nx1 = lines.Length - 1;
+
+            double[] xCoords = new double[Nx1+1];
+            double[,] doseValues = new double[Nx, Nz1];
+
+            for (int ix = 0; ix < Nx1; ix++)
+            {
+                string[] parts = lines[ix].Split(';');
+
+                xCoords[ix] = double.Parse(parts[0]); // X position
+                for (int iz = 0; iz < Nz1; iz++)
+                    doseValues[ix, iz] = double.Parse(parts[iz + 1]);
+            }
+
+            // === STEP 2: Build Coordinates3d[,] ===
+            Coordinates3d[,] cs = new Coordinates3d[Nx1, Nz1];
+            for (int ix = 0; ix < Nx1; ix++)
+            {
+                for (int iz = 0; iz < Nz1; iz++)
+                {
+                    double x = xCoords[ix];
+                    double z = zCoords[iz];
+                    double val = doseValues[ix, iz];
+                    cs[iz, ix] = new Coordinates3d(x, z, val); // (Z, X, Value)
+                }
+            }
+            double maxVal = cs.Cast<Coordinates3d>().Max(c => c.Z);
+            var contour = plt.Add.ContourLines(cs);
+            contour.ContourLineLevels = new double[]
+            {
+                0.2 * maxVal,
+                0.4 * maxVal,
+                0.6 * maxVal,
+                0.8 * maxVal,
+                1.0 * maxVal
+            };
+            var heatmap = plt.Add.Heatmap(cs);
+            heatmap.FlipVertically = true;
+            heatmap.Colormap = new ScottPlot.Colormaps.MellowRainbow();
+            contour.LabelStyle.Bold = true;
+            contour.LinePattern = LinePattern.DenselyDashed;
+            contour.LineColor = Colors.Black.WithAlpha(.5);
+            plt.Axes.TightMargins();
+            plt.HideAxesAndGrid();
+            plt.SavePng(photonEnergyMeV.ToString() + "MeV" + "_isoLines.png", 1200, 800);*/
+
             Console.WriteLine($"Exported Y-slice {yIndex} to CSV: {filename}");
         }
         public void ExportFullKernel(string filename, double numPhotons, double photonEnergyMeV)
@@ -140,9 +194,9 @@ namespace MCassignment_PHYS539_PeidusD_2025.Containers
             Bitmap bigBmp = new Bitmap(width*scale, height*scale);
             Graphics g = Graphics.FromImage(bigBmp);
             g.SmoothingMode = SmoothingMode.HighQuality;
-            g.Clear(Color.White);
+            g.Clear(System.Drawing.Color.LightBlue);
             //Draw tracks
-            Pen trackPen = new Pen(Color.Black,1);
+            Pen trackPen = new Pen(System.Drawing.Color.Black,1);
 
             foreach (var track in electronTracks)
                 for (int i = 1; i < track.Count; i++)
@@ -166,59 +220,10 @@ namespace MCassignment_PHYS539_PeidusD_2025.Containers
             Bitmap finalBitmap = new Bitmap(Nx, Nz);
             Graphics gFinal = Graphics.FromImage(finalBitmap);
             gFinal.DrawImage(bigBmp,0,0,Nx,Nz);
-            finalBitmap.Save($"{photonEnergy}MeV_"+filename, ImageFormat.Png);
+            finalBitmap.Save($"{photonEnergy}MeV_"+filename, System.Drawing.Imaging.ImageFormat.Png);
             Console.WriteLine($"Saved slice+electron tracks: {filename}");
         }
-        public void SaveKernelWithIsolinesFromMaxYslice(double energy, string filename, int scale)
-        {
-            int width = Nx * scale;
-            int height = Nz * scale;
 
-            Bitmap bmp = new Bitmap(width, height);
-            Graphics g = Graphics.FromImage(bmp);
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.Clear(Color.White);
-
-            //Extract 1D slice from the phantom
-            int yIndex = FindPeakYSlice();
-            double[,] slice = GetSlice2D_Y(yIndex);
-            double[] allValues = slice.Cast<double>().ToArray();
-            Array.Sort(allValues);
-            double robustMax = allValues[(int)(allValues.Length*0.999)];
-
-            //Define contour levels and brushes
-            var contourLevels = new (double min, double max, Brush brush)[]
-            {
-                (0.00, 0.20, Brushes.DarkBlue),
-                (0.20, 0.40, Brushes.Cyan),
-                (0.40, 0.60, Brushes.Green),
-                (0.60, 0.80, Brushes.Purple),
-                (0.80, 1.00, Brushes.Red)
-            };
-
-            //Draw isodose contours as dots (threshold levels)
-            for (int ix = 0; ix < Nx - 1; ix++)
-            {
-                for (int iz = 0; iz < Nz; iz++)
-                {
-                    double doseFraction = slice[ix, iz] / robustMax;
-                    if (doseFraction > 0.99999) doseFraction = 1;
-                    foreach(var (min,maxLevel,brush) in contourLevels)
-                    {
-                        if (doseFraction >= min && doseFraction < maxLevel && doseFraction>0)
-                        {
-                            int x = ix * scale;
-                            int z = iz*scale;
-                            g.FillRectangle(brush, x, z,scale,scale);
-                            break;
-                        }
-                    }
-                }
-            }
-            
-            bmp.Save($"{energy}MeV_"+filename, ImageFormat.Png);
-            Console.WriteLine($"{energy}MeV isodose contour image saved.");
-        }
         public int FindPeakYSlice()
         {
             double max = 0;

@@ -12,6 +12,7 @@ namespace MCassignment_PHYS539_PeidusD_2025.Helpers
             public double Pair;
             public double Total => Photoelectric + Compton + Pair;
         }
+        
         public static CrossSections GetCrossSections(double energy)
         {
             if (Math.Abs(energy - 2.0) < 0.1)
@@ -63,12 +64,12 @@ namespace MCassignment_PHYS539_PeidusD_2025.Helpers
             switch (interaction)
             {
                 case "photoelectric":
-                    eEnergy = photonEnergy;
+                    eEnergy = Math.Round(photonEnergy,5);
                     eDirection = photonDir;
                     break;
                 case "compton":
                     // Step 1: Sample realistic scattered photon direction
-                    Vector3 scatteredPhotonDir = PhysicsData.SampleScatteredComptonPhotonDirection(photonEnergy, photonDir, maxKleinNichProb);
+                    Vector3 scatteredPhotonDir = PhysicsData.SampleScatteredComptonPhotonDirection(photonEnergy, photonDir, maxKleinNichProb,statistics);
 
                     // Step 2: Calculate angle between original and scattered direction
                     double anglePhoton = Vector3AngleBetween(photonDir, scatteredPhotonDir);
@@ -77,9 +78,9 @@ namespace MCassignment_PHYS539_PeidusD_2025.Helpers
 
                     // Step 3: Compute electron energy
                     eEnergy = photonEnergy - scatteredEnergy;
-
+                    statistics.SaveComptonEnergy(eEnergy);
                     // Step 4: Estimate electron angle based on momentum conservation
-                    double cotThetaElectron = (1+ photonEnergy / 0.511)*Math.Tan(anglePhoton/2);
+                    double cotThetaElectron = (1+ photonEnergy / 0.511)*Math.Tan(anglePhoton*0.5);
 
                     double thetaElectron = Math.Atan(1/cotThetaElectron);
 
@@ -89,19 +90,26 @@ namespace MCassignment_PHYS539_PeidusD_2025.Helpers
                     eDirection = PhysicsData.RotateToDirection(localEDir, photonDir);
                     statistics.RecordComptonScatteringAngle(anglePhoton);
                     break;
+
                 case "pair":
                     double T = photonEnergy - 1.022;
-                    eEnergy = SamplePairProductionEnergy(photonEnergy);
-                    pEnergy = T - eEnergy;
-                    theta = SamplePairProductionAngle(eEnergy);
+                    pEnergy = SamplePairProductionEnergy(photonEnergy);
+                    eEnergy = T - pEnergy;
+                    //theta = SamplePairProductionAngleTranslation(eEnergy);
+                    theta = SamplePairProductionAngleRejection(eEnergy); 
+
+
                     phi = SampleAzimutalAngle();
 
-                    theta_p = SamplePairProductionAngle(eEnergy);
+                    //theta_p = SamplePairProductionAngleTranslation(pEnergy);
+                    theta_p = SamplePairProductionAngleRejection(pEnergy);
                     phi_p = SampleAzimutalAngle();
 
                     eDirection = SphericalToCartesian(theta, phi);
                     pDirection = SphericalToCartesian(theta_p, phi_p);
-                    statistics.RecordPairScatteringAngle(theta);
+
+                    statistics.RecordPairScatteringAngle_e(theta);
+                    statistics.RecordPairScatteringAngle_p(theta_p);
                     break;
             }
             return (eEnergy, eDirection, pEnergy, pDirection);
@@ -119,26 +127,27 @@ namespace MCassignment_PHYS539_PeidusD_2025.Helpers
         }
         public static double SamplePairProductionEnergy(double photonEnergy)
         {
-            double Tmax = photonEnergy - 1.022;
-
-            const int maxTries = 10000;
-            for (int i = 0; i < maxTries; i++)
+            double output;
+            double Tmax = (photonEnergy - 1.022)/2;
+            while (true)
             {
                 var random = new Random();
                 var R = random.NextDouble();
                 var random1 = new Random();
                 var R1 = random1.NextDouble();
 
-                double x = R;
+                double x = (R*Tmax)/(photonEnergy-2*0.511);
                 double fx = Math.Log(1000 * x + 1);
-                double y = R1 * Math.Log(1001);
-                if (y < fx) return x * Tmax;
+                double y = R1 * Math.Log(1000* Tmax + 1);
+                output = R * Tmax;
+                if (y < fx) 
+                    return output;
             }
-            return Tmax / 2;
         }
-        public static Vector3 SampleScatteredComptonPhotonDirection(double photonEnergyMeV, Vector3 incidentDirection, double maxKleinNichProb)
+        public static Vector3 SampleScatteredComptonPhotonDirection(
+            double photonEnergyMeV, Vector3 incidentDirection, 
+            double maxKleinNichProb, StatisticsToExport statistics)
         {
-            const double mec2 = 0.511; // MeV
             Random rng = new Random();
             double theta, phi;
             var electronRadius = Constants.electronRadius_m;
@@ -147,17 +156,18 @@ namespace MCassignment_PHYS539_PeidusD_2025.Helpers
             while (true)
             {
                 theta = rng.NextDouble() * Math.PI; // phi_p in [0, pi]
-
                 var hv = photonEnergyMeV;
-                var hv_prime = hv / (1+(hv/0.511)*(1-Math.Cos(theta)));
+                var hv_prime = hv / (1 + (hv / 0.511) * (1 - Math.Cos(theta)));
+                var a = Math.PI * Math.Sin(theta) * Math.Pow(electronRadius, 2);
+                var b = Math.Pow((hv_prime / hv), 2);
+                var c = hv / hv_prime + hv_prime / hv - Math.Pow(Math.Sin(theta), 2);
+                var cs = a * b * c;
 
-                var thisKlNichCrs = (Math.PI) * (Math.Sin(theta)) * (Math.Pow((hv_prime / hv), 2));
-                thisKlNichCrs = thisKlNichCrs * (hv / hv_prime + hv_prime / hv - Math.Pow(Math.Sin(theta), 2));
-                thisKlNichCrs = thisKlNichCrs * Math.Pow(electronRadius, 2);
+                Random random = new Random();
+                var R2 = random.NextDouble();
+                double sampledMaxProb = R2*maxKleinNichProb; // Safe upper bound
 
-                double maxProb = maxKleinNichProb; // Safe upper bound
-                
-                if (rng.NextDouble() * maxProb <= thisKlNichCrs)
+                if (sampledMaxProb <= cs)
                     break;
             }
 
@@ -166,7 +176,7 @@ namespace MCassignment_PHYS539_PeidusD_2025.Helpers
 
             // Local direction (relative to z-axis)
             Vector3 localDirection = SphericalToCartesian(theta, phi);
-
+            
             // Rotate local direction to align with incident photon direction
             return RotateToDirection(localDirection, incidentDirection);
         }
@@ -181,23 +191,54 @@ namespace MCassignment_PHYS539_PeidusD_2025.Helpers
             Quaternion rotation = Quaternion.CreateFromAxisAngle(Vector3.Normalize(axis), angle);
             return Vector3.Transform(local, rotation);
         }
-        public static double SamplePairProductionAngle(double particleEnergy)
+        public static double SamplePairProductionAngleRejection(double particleEnergy)
         {
-            //Sample scattering angle randomly from 0 to 2PI
+            //Sample scattering angle randomly from 0 to PI
             var random = new Random();
             var R = random.NextDouble();
-            R = R * 2*Math.PI;
-            //double beta = Math.Sqrt(1 - 1 / Math.Pow(((particleEnergy/0.511)+1),2));
-            //double scatteringAngleCos = (beta * R - R + 1) / (beta * beta * R - beta * R + 1);
-            //double scatteringAngle = Math.Acos(scatteringAngleCos);
+            R = R * Math.PI;
 
             double beta = Math.Sqrt(1 - 1 / Math.Pow((particleEnergy / 0.511) + 1, 2));
+            double maxPairProdCs = PairProductionHelper.SamplePairProductionCrSct(particleEnergy);
             double alarama;
+            double scatteringAngle=0.0;
             if (beta > 1 || beta < 0)
                 alarama = 0.0;
-            double scatAnglCos = (1 / beta) * (1 - (1 / ((1 / (1 - beta)) - (beta * R / (2 * Math.PI)))));
-            double scatteringAngle = Math.Acos(scatAnglCos);
-            return scatteringAngle;
+            
+            while (true)
+            {
+                var random1 = new Random();
+                var R1 = random1.NextDouble();
+                var phi = R1 * Math.PI;
+
+                var thisPairProdCs = (Math.PI * Math.Sin(phi)) / Math.Pow((1 - beta * Math.Cos(phi)), 2);
+
+                var random2 = new Random();
+                var R2 = random2.NextDouble();
+                R2 = R2 * maxPairProdCs;
+
+                if (thisPairProdCs > R2)
+                {
+                    scatteringAngle = phi;
+                    return scatteringAngle;
+                }
+            }
+        }
+        public static double SamplePairProductionAngleTranslation(double particleEnergy)
+        {
+            //Sample scattering angle randomly from 0 to PI
+            var random = new Random();
+            var R = random.NextDouble();
+            R = R * Math.PI;
+
+            double beta = Math.Sqrt(1 - 1 / Math.Pow((particleEnergy / 0.511) + 1, 2));
+
+            var up = (1 + beta * R - R);
+            var down = (1 - beta * R + (Math.Pow(beta, 2)) * R);
+            double cosAngle = up / down;
+            double angle = Math.Acos(cosAngle);
+
+            return angle;
         }
         public static Vector3 SphericalToCartesian(double theta,double phi)
         {
@@ -207,41 +248,85 @@ namespace MCassignment_PHYS539_PeidusD_2025.Helpers
                 (float)(sinTheta * Math.Sin(phi)),
                 (float)(Math.Cos(theta)));
         }
-        public static double SampleMultipleScatteringAngle (double eMeV)
+        public static double SampleMultipleScatteringAngleRejection (double eMeV,double pathLength)
         {
-            double thetaSquared = GetMeanScatteringAngleSquaredForWater(eMeV);
-            thetaSquared = 0.01;
-            //Sample from Rayleigh distribution via Transformation method
-            var random = new Random(); var R = random.NextDouble();
-            var multipleScatteringAngle = Math.Sqrt(-thetaSquared * Math.Log(1- R));
+            double thetaSquared = GetMeanSquaredScatteringAngleSquaredForWater(eMeV,pathLength);
+            double maxProbability =maxCollisionScatteringProbability.GetMaxColScatteringProb(eMeV,pathLength);
+            if (eMeV > 0)
+            {
+                while (true)
+                {
+                    var random = new Random(); 
+                    var R1 = random.NextDouble();
+                    var random1 = new Random(); 
+                    var R2 = random1.NextDouble();
 
-            return multipleScatteringAngle;
+                    var a = 2 * R1 / Math.Pow(Math.PI, 2); 
+                    a = a / thetaSquared;
+
+                    var b = Math.Pow(R1, 2); 
+                    b = b / thetaSquared; 
+                    b = Math.Exp(-b);
+
+                    var thisScatteringProbability = a * b;
+
+                    var sampledMaxProb = R2 * maxProbability;
+
+                    if (sampledMaxProb < thisScatteringProbability)
+                        return R1;
+                }
+            }
+            return 0.0;
         }
-        private static double GetMeanScatteringAngleSquaredForWater(double eMeV)
+        public static double SampleMultipleScatteringAngleTranslation(double eMeV, double pathLength)
+        {
+            double thetaSquared = GetMeanSquaredScatteringAngleSquaredForWater(eMeV, pathLength);
+            //double maxProbability = maxCollisionScatteringProbability.GetMaxColScatteringProb(eMeV, pathLength);
+            if (eMeV > 0)
+            {
+                var random = new Random();
+                var R1 = random.NextDouble();
+
+                var log = Math.Log(1 - R1);
+                var ratio = log * thetaSquared * (-1);
+                var angle = Math.Sqrt(ratio);
+                var random1 = new Random();
+                var R2 = random1.NextDouble();
+                if (R2 >= 0.5)
+                    angle = angle * (-1);
+                return angle;
+            }
+            return 0.0;
+        }
+        public static double GetMeanSquaredScatteringAngleSquaredForWater(double eMeV, double pathLength)
         {
             //Const for water
-            double Z = 7.42;
-            double A = 14.94;
-            double z = 1;
-            double m = 0.511;
+            double Z = Constants.Z;
+            double A = Constants.A;
+            double z = Constants.z;
+            double m = Constants.m;
+            double F = 0.9;
+            var x = pathLength;
 
-            //Kinematics
-            double Etotal = eMeV + m;
-            double gamma = Etotal / m;
-            double beta = Math.Sqrt(1.0 - 1.0 / (gamma * gamma));
-            double p = Math.Sqrt(eMeV * eMeV + 2 * eMeV * m);
+            var totalEnergy = eMeV + 0.511;
+            var p = Math.Sqrt(Math.Pow(totalEnergy, 2) - Math.Pow(m, 2));
+            var beta = p / totalEnergy;
+            var Xc2 = 0.157 * z * ((Z * (Z + 1)) / A) * x / (Math.Pow(p, 2) * Math.Pow(beta, 2));
+            double alpha = 0.00729927007299270072992700729927;
 
-            //Compute chi^2
-            double chiSquared = 2.007e-5 * Z * (Z + 1) / (A * p * p * beta * beta);
+            var aa = (2.007e-5);
+            double power = 2; power = power / 3;
+            var bb = Math.Pow(Z, power);
+            var cc = Math.Pow((Z * z * alpha / beta), 2);
+            var Xa2 = aa * bb * (1 + 3.14 * cc) / Math.Pow(p, 2);
 
-            //Compute omega and nu
-            double Omega = chiSquared * z * z;
-            double F = 0.9; //correction factor (empirical)
-            double nu = 0.5 * Omega / (1.0 - F);
+            var omega =Xc2/Xa2;
+            var nu = 0.5 * omega / (1 - F);
+            var a = 2*Xc2/(1+Math.Pow(F,2));
+            var b = (1 + nu) / nu;
+            var c = Math.Log(1 + nu);
 
-            //Full formula for thetaSquared
-            double logTerm = Math.Log(1 + nu);
-            double thetaSquared = (2 * chiSquared) / (1 + F * F) / ((1 + nu) / nu * logTerm - 1);
+            var thetaSquared = a * (b * c - 1);
 
             return thetaSquared; //in radians
         }

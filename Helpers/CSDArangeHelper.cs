@@ -25,10 +25,11 @@ namespace MCassignment_PHYS539_PeidusD_2025.Helpers
                 var (E1,R1) = CSDArangeTable[i];
                 var (E2,R2) = CSDArangeTable[i+1];
 
-                if (eMeV>=E1&& eMeV <= E2)
+                if (eMeV >= E1&& eMeV <= E2)
                 {
                     double fraction = (eMeV - E1) / (E2 - E1);
-                    return R1 + fraction * (R2 - R1);
+                    var stopPower = R1 + fraction * (R2 - R1);
+                    return stopPower;
                 }
             }
 
