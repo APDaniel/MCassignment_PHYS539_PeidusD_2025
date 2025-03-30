@@ -30,8 +30,6 @@ namespace MCassignment_PHYS539_PeidusD_2025.Engine
                 {
                     for (int iz = 0; iz < voxels.Nz; iz++)
                     {
-                        for (int photon = 1; photon <= photPerVxl; photon++)
-                        {
                             Random random = new();
                             var R1 = random.NextDouble();
                             var oneOverMu = 1 / mu;
@@ -42,18 +40,14 @@ namespace MCassignment_PHYS539_PeidusD_2025.Engine
                             position = position + direction;
                             statistics.SavePhotonTravelDistance(position.Z);
                             var doseGrid = voxels.GetDoseGrid();
-
                             var positionZinVoxels = position.Z / voxels.VoxelSizeCm;
-
                             if (positionZinVoxels < voxels.Nz)
-                                doseGrid[(int)position.X, (int)position.Y, (int)positionZinVoxels] += 1;
-
-                        }
+                                voxels.DepositEnergy(position.X, (int)position.Y, (int)positionZinVoxels,1);
+                                
                     }
                     
                 }
-            }
-            
+            } 
         }
     }
 }

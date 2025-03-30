@@ -31,15 +31,15 @@ namespace MCassignment_PHYS539_PeidusD_2025.Tasks
             Console.WriteLine("\nCalculating the amount of photons interacting per voxel...");
             ConvolutionSuperpositionEngine engineConvolution = new();
 
-            ConvolutionSuperpositionEngine.CalculateNumberOfInteractingPhotonsPerVoxel(largeWaterTank,1000000,statistics);
+            ConvolutionSuperpositionEngine.CalculateNumberOfInteractingPhotonsPerVoxel(largeWaterTank,100000,statistics);
             Console.WriteLine("Number of interactions calculated.\nInitiaizing convolution-superposition...");
             var maxKlNichProb = maxKleinNichinaHelper.SampleMaxKleinNichina(10);
             var lookupElScat = ElectronPositronScatteringAngleLookupTable.LookupElectronScatAngle(10, voxelSizeCm);
             MonteCarloEngine engineMC = new();
 
-            //engineMC.RunPhotonKernelCalculation(voxels, 1000000, 10, maxKlNichProb, statistics, 0.05, lookupElScat);
+            engineMC.RunPhotonKernelCalculation(voxels, 100, 10, maxKlNichProb, statistics, 0.05, lookupElScat);
             var test=largeWaterTank.FindPeakYSlice();
-            largeWaterTank.ExportSliceY(test, "TEST", 10000000, 10);
+            largeWaterTank.ExportSliceY(test, "TEST1", 100000, 10);
 
 
             var kernel = voxels.GetDoseGrid();

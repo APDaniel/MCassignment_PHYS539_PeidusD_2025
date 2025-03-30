@@ -37,41 +37,58 @@ public static class ManualConvolver3D
                         cz = k;
                     }
                 }
-        for (int ix = 0; ix < nx; ix++)
+
+        // Prepare a buffer for thread-safe merging
+        double[,,] accumulatedResult = new double[nx, ny, nz];
+
+        Parallel.For(0, nx, ix =>
         {
+            double[,,] localBuffer = new double[nx, ny, nz];
+
             for (int iy = 0; iy < ny; iy++)
             {
-                for (int iz = 0; iz < ny; iz++)
+                for (int iz = 0; iz < nz; iz++)
                 {
-                    for (int i0 = 0; i0 < kx; i0++)
+                    double value = photonMapDoseMatrix[ix, iy, iz];
+                    if (value == 0) continue;
+
+                    for (int dx = 0; dx < kx; dx++)
                     {
-                        for (int i1 = 0; i1 < ky; i1++)
+                        int tx = ix + dx - cx;
+                        if (tx < 0 || tx >= nx) continue;
+
+                        for (int dy = 0; dy < ky; dy++)
                         {
-                            for (int i2 = 0; i2 < kz; i2++)
+                            int ty = iy + dy - cy;
+                            if (ty < 0 || ty >= ny) continue;
+
+                            for (int dz = 0; dz < kz; dz++)
                             {
-                                if (i0 < kx && i1 < ky && i2 < kz)
-                                {
-                                    var test1 = photonMapDoseMatrix[ix, iy, iz];
-                                    var test2 = kernelDoseMatrix[i0, i1, i2];
-                                    var test3 = photonMapDoseMatrix[i0, i1, i2];
-                                    if (test2 != 0)
-                                    {
-                                        photonMapDoseMatrix[i0, i1, i2] += test1 * test2;
-                                    }
-                                }
+                                int tz = iz + dz - cz;
+                                if (tz < 0 || tz >= nz) continue;
+
+                                double dose = value * kernelDoseMatrix[dx, dy, dz];
+                                if (dose == 0) continue;
+
+                                localBuffer[tx, ty, tz] += dose;
                             }
                         }
                     }
                 }
             }
-        }
-        
 
-        
+            lock (accumulatedResult)
+            {
+                for (int x = 0; x < nx; x++)
+                    for (int y = 0; y < ny; y++)
+                        for (int z = 0; z < nz; z++)
+                            photonMap.DepositEnergy(x, y, z, localBuffer[x, y, z]) ;
+            }
+        });
+
         double maxDose = photonMapDoseMatrix.Cast<double>().Max();
+        ExportPeakSlices(photonMapDoseMatrix, "TEST");
         Console.WriteLine($"Brute-force convolution completed. Max dose: {maxDose:G6}");
-        ExportPeakSlices(photonMapDoseMatrix, "DoseMatrix");
-
     }
     public static void ExportPeakSlices(double[,,] doseGrid, string baseName = "dose")
     {
