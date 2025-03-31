@@ -7,6 +7,13 @@ class MyWifeHasNeverSeenMeCryingBefore
     public static StatisticsToExport statistics = new StatisticsToExport();
     static void Main(string[] args)
     {
+        /************************************************************************************
+        The script starts with a simple user's input: 1,2 or 3.
+        I did not have time to design a nice interface, 
+        so a desigion has been made to stick to something simple
+        in order to keep it user-friendy as much as possible.
+         ************************************************************************************/
+
         Console.WriteLine("PHYS-539 Assignment 2025. By Peidus Daniel.");
         Console.WriteLine("==========================================");
         Console.WriteLine("Choose Simulation");
@@ -14,6 +21,14 @@ class MyWifeHasNeverSeenMeCryingBefore
         Console.WriteLine("2. Broad paralell photon beam simulation");
         Console.WriteLine("3. Broad paralell electron beam simulation");
         Console.Write("Enter your choice (1, 2, 3): ");
+
+        /************************************************************************************
+        This part commuticates with the selected controller for each particulat simulation.
+        3 simulations modeled: 
+        - Monte Carlo simulations: for photon pencil beam (2,6,10 MeV); 
+        for beta- field (10MeV, FS10x10);
+        - Convolution-superposition: 10x10 photon field. Beam broadening effect has been omitted. 
+        /************************************************************************************/
 
         int problem = int.Parse(Console.ReadLine());
         if (problem == 1) { RunProblemI(statistics); }

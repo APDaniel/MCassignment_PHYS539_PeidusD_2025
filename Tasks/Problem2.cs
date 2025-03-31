@@ -5,6 +5,13 @@ namespace MCassignment_PHYS539_PeidusD_2025.Tasks
 {
     public static class Problem2
     {
+    /************************************************************************************
+    Class is a controller fot the Problem Ia. Convolution-Superposition calculations.
+    I was limited with the deadline, so to simplify the workflow, 
+    I perform MC for 10MeV 10e6 particles and then use it as a Kernel for each particle
+    position calculated for the FS10x10, 10e7 aprticles. The MC elgorithm is very efficient,
+    and does not take long to be calculated. Even on the 10+ years old laptop.
+    ************************************************************************************/
         public static void ElectromBroadBeamTask(StatisticsToExport statistics)
         {
             double electronEnergy = 10.0;
